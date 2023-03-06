@@ -21,3 +21,10 @@ Algorithm for dependency-based Graphs-of-Words: find the dependency tree for eac
 Algorithm for constituency-based Graphs-of-Words: like dependency (found with spacy and benepar), but there is a further operation: projection on the leaf nodes (the only nodes in constituency trees that contain tokens). Again, the edge weights come from contractions, reconnections, but also projection (every shortest path on the tree between unconnected token nodes becomes a simple edge with weight=shortest path length; shortest paths on trees are computed using lowest common ancestors). Edge weights represent syntactic distance.
 
 Use python 3.10 (somewhere in the imports a module dependency requires it, I think).
+
+---
+
+Some instructions:
+- unzip lit_corpus.zip into literature/ (it already contains pre-computed graphs-of-words in .dot files, so you can skip the next step)
+- run "./gow_batch.sh literature/" to create graphs-of-words (4-proximity, constituency, dependency) on the whole literature/ corpus (this calls ./graphwords2.py multiple times)
+- run "./tfidf.py literature/" to compute ranks on the whole literature/ corpus
