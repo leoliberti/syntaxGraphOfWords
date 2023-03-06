@@ -34,7 +34,7 @@ from xml.etree import ElementTree
 
 ## method for creating Graph of Words
 gowMethod = "constituency"
-gowClassicRadius = 2
+gowClassicRadius = 4
 
 ## draw the graph?
 drawGraphFlag = False
@@ -42,6 +42,7 @@ drawGraphFlag = False
 
 ## whether to add a linear text path to tree-based methods
 linearTextFlag = True
+linearTextFlag = False
 
 ## fewer warnings at launch (from T5TokenizerFast?)
 arg_constraints = {}
@@ -63,10 +64,12 @@ nlp.add_pipe('benepar', config={'model': 'benepar_en3'})
 
 ## various useful categories of word tags
 spaceOrPunct = ['SPACE', 'PUNCT']
-importantPos = ['VERB', 'NOUN', 'ADJ']
+removeTags = ['HYPH']
+importantPos = ['VERB', 'NOUN', 'ADJ', 'VP']
 #importantPos = ['VERB', 'NOUN', 'ADJ', 'PRON']
 notSpellings = ["n't", "not"]
 prepTags = ['ADV', 'ADVP', 'ADP', 'IN', 'PRT']
+genericLemmata = ["do", "be"]
 
 ########## FUNCTIONS ###########
 
@@ -130,7 +133,7 @@ def constituencyPrint(node, level):
         print(':', node.text)
     # recursive part
     for n in node._.children:
-        if n[0].pos_ not in spaceOrPunct:
+        if n[0].pos_ not in spaceOrPunct and n[0].tag_ not in removeTags:
             constituencyPrint(n, level+1)
     return
 
@@ -142,7 +145,7 @@ def dependencyPrint(node, level):
     print(tab*level + node.pos_ + '/' + node.tag_, ':', node.text)
     # recursive part
     for n in node.children:
-        if n.pos_ not in spaceOrPunct:
+        if n.pos_ not in spaceOrPunct and n.tag_ not in removeTags:
             dependencyPrint(n, level+1)
     return
 
@@ -171,7 +174,7 @@ def constituencyGraph(node, gph):
     ## recursive part
     subnodes = []
     for n in node._.children:
-        if n[0].pos_ not in spaceOrPunct:
+        if n[0].pos_ not in spaceOrPunct and n[0].tag_ not in removeTags:
             subnodes.append(constituencyGraph(n, gph))
     ## at this node
     lab = node._.labels
@@ -190,7 +193,7 @@ def dependencyGraph(node, gph):
     ## recursive part
     subnodes = []
     for n in node.children:
-        if n.pos_ not in spaceOrPunct:
+        if n.pos_ not in spaceOrPunct and n.tag_ not in removeTags:
             subnodes.append(dependencyGraph(n, gph))
     ## at this node
     # find new node ID
@@ -223,6 +226,11 @@ def syntaxTrees(doc, conFlag):
                 tag[v] = Gd[v][0][3]
             except:
                 tag[v] = ""
+        if conFlag:
+            # constituency trees have non-leaf nodes labelled by POS
+            for v in Gd:
+                if len(Gd[v][1]) > 0:
+                    labels[v] = pos[v]
         nx.set_node_attributes(T[i], labels, "labels")
         nx.set_node_attributes(T[i], lem, "lem")
         nx.set_node_attributes(T[i], pos, "pos")
@@ -310,6 +318,7 @@ def graphOfWords(doc, conFlag, lintext=linearTextFlag):
             Gs[i] = constituencyLeafGraph(T[i])
         else:
             Gs[i] = T[i]
+        #drawTree(T[i])
         # relabel the vertices so that the union is vertex disjoint
         rn = {v:v+startID for v in Gs[i].nodes}
         nx.relabel_nodes(Gs[i], rn, copy=False)
@@ -363,12 +372,13 @@ def graphOfWords(doc, conFlag, lintext=linearTextFlag):
 # traditional graph-of-words with sliding window of given radius
 def classicGraphOfWords(doc, radius=2):
     # only keep interesting tokens
-    toks = [t for t in doc if t.pos_ in importantPos]
-    lem = {i+1:t.lemma_ for i,t in enumerate(toks)}
+    toks = [t for t in doc if t.pos_ in importantPos and t.lemma_ not in genericLemmata]
+    labels = {i+1:t.text for i,t in enumerate(toks)}
+    lem = {i+1:t.lemma_ for i,t in enumerate(toks)} 
     # make the old-style graph-of-words
     G = nx.Graph()
-    nx.add_path(G, list(lem.keys()), weight=1.0)
-    nx.set_node_attributes(G, lem, "labels") # "labels" so it can be drawn
+    nx.add_path(G, list(labels.keys()), weight=1.0)
+    nx.set_node_attributes(G, labels, "labels") 
     n = G.number_of_nodes()
     # add edges from sliding text window
     inner_nodes = [v for v in G.nodes if v-radius >= 1 and v+radius <= n]
@@ -411,7 +421,8 @@ if len(sys.argv) < 2:
 # read text
 with open(sys.argv[1], 'r') as tf:
     txt = tf.read()
-
+txt.replace('\n',' ').replace('\r',' ')
+    
 # parse command line options
 conFlag = True
 if len(sys.argv) >= 3:
@@ -437,11 +448,16 @@ G = None
 if gowMethod == "classic":
     G = classicGraphOfWords(doc, gowClassicRadius)
     lname = "labels"
+    outName = '.'.join(os.path.basename(sys.argv[1]).split('.')[:-1]) + "-classic_r" + str(gowClassicRadius) + '.dot'
 else:
     G = graphOfWords(doc, conFlag)
-    lname = "lem"
+    lname = "labels" # or "lem" for lemmata
+    outName = '.'.join(os.path.basename(sys.argv[1]).split('.')[:-1])
+    if conFlag:
+        outName += "-constituency.dot"
+    else:
+        outName += "-dependency.dot"
 if drawGraphFlag:
     drawGraph(G, labelName=lname)
-
-outName = '.'.join(os.path.basename(sys.argv[1]).split('.')[:-1]) + '.dot'
+# save it to a graphViz .dot file
 nx.drawing.nx_agraph.write_dot(G, outName)
