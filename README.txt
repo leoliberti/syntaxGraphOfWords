@@ -28,3 +28,5 @@ Some instructions:
 - unzip lit_corpus.zip into literature/ (it already contains pre-computed graphs-of-words in .dot files, so you can skip the next step)
 - run "./gow_batch.sh literature/" to create graphs-of-words (4-proximity, constituency, dependency) on the whole literature/ corpus (this calls ./graphwords2.py multiple times)
 - run "./tfidf.py literature/" to compute ranks on the whole literature/ corpus
+
+And similarly for the technical questions corpus (tech_questions_corpus.zip, which unzips a directory called "questions/").
